@@ -1,0 +1,13 @@
+repodirs=(repo/{main,imobiledevice})
+distdir=dist
+workdir=/tmp/build
+dbdir=db
+prefix=/tmp/rootfs
+makejobs=$(nproc)
+
+export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+export CC=clang
+export CXX=clang++
+export CFLAGS="-O2 -march=native"
+export CXXFLAGS="-O2 -march=native"
+export LDFLAGS=""

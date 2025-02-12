@@ -1,0 +1,5 @@
+inherit cmake
+
+src=(
+    "https://github.com/nih-at/$pkg/releases/download/v$ver/$pkg-$ver.tar.gz"
+)

@@ -1,0 +1,9 @@
+./ezpkg libplist git
+./ezpkg libimobiledevice-glue git
+./ezpkg libusbmuxd 2.1.0
+./ezpkg libtatsu git
+./ezpkg libimobiledevice git
+./ezpkg usbmuxd git
+./ezpkg libirecovery git
+./ezpkg libzip 1.11.3
+./ezpkg idevicerestore git

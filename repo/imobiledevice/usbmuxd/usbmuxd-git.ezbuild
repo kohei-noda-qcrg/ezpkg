@@ -1,0 +1,6 @@
+inherit imobiledevice-git
+
+pkg_configure() {
+    # TODO: want to disable udev too
+    imobiledevice_git_configure --without-systemd --with-udevrulesdir=$prefix/lib/udev/rules.d
+}

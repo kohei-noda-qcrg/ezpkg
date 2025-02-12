@@ -1,0 +1,24 @@
+make_configure() {
+    $src_root/configure --prefix=$prefix "$@" || panic
+}
+
+make_build() {
+    make -j$makejobs || panic
+}
+
+make_install() {
+    make DESTDIR=$destdir install || panic
+}
+
+# default callbacks
+pkg_configure() {
+    make_configure
+}
+
+pkg_build() {
+    make_build
+}
+
+pkg_install() {
+    make_install
+}

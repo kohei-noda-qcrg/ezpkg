@@ -1,0 +1,14 @@
+inherit make
+
+src=(
+    "https://github.com/libimobiledevice/$pkg.git"
+)
+
+imobiledevice_git_configure() {
+    NOCONFIGURE=1 "$src_root/autogen.sh"
+    make_configure "$@"
+}
+
+pkg_configure() {
+    imobiledevice_git_configure
+}

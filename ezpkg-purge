@@ -1,0 +1,17 @@
+#!/bin/bash
+# $1 dbfile
+
+if [[ ! -e $1 ]]; then
+    echo "usage: ezpkg-uninstall path/to/dbfile"
+    exit 1
+fi
+
+tac "$1" | while read file; do
+    if [[ -d $file ]]; then
+        rmdir $file 2>/dev/null && echo "directory $file removed"
+    else
+        rm $file && echo "file $file removed"
+    fi
+done
+
+rm "$1" && echo "done"

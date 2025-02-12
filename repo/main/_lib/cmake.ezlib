@@ -1,0 +1,10 @@
+inherit make
+
+cmake_configure() {
+    cmake -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_BUILD_TYPE=Release "$src_root" || panic
+}
+
+# default callbacks
+pkg_configure() {
+    cmake_configure
+}

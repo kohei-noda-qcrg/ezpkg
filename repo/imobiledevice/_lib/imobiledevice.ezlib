@@ -1,0 +1,5 @@
+inherit make
+
+src=(
+    "https://github.com/libimobiledevice/$pkg/releases/download/$ver/$pkg-$ver.tar.bz2"
+)

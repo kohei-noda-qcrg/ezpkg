@@ -1,0 +1,273 @@
+#!/bin/bash
+# $1 package
+# $2 version
+
+# $@ message
+panic() {
+    echo "$@" >&2
+    echo "fatal error occurred, stacktrace:" >&2
+    for i in "${!FUNCNAME[@]}"; do
+        func=${FUNCNAME[$i]}
+        file=${BASH_SOURCE[$i]}
+        line=${BASH_LINENO[$i - 1]}
+        echo "  $func ($file:$line)" >&2
+    done
+    exit 1
+}
+
+#
+# config
+#
+source config || panic
+
+#
+# source ezbuild
+#
+
+# $1 package
+# $2 version
+find_ezbuild() {
+    for repo in ${repodirs[@]}; do
+        file=$repo/$1/$1-$2.ezbuild
+        if [[ -e $file ]]; then
+            realpath "$file" || panic
+            return 0
+        fi
+    done
+    return 1
+}
+
+pkg=$1
+ver=$2
+ezbuild=$(find_ezbuild $pkg $ver) || panic "no ezbuild available for $1-$2"
+
+# $1 class name
+# ...
+inherit() {
+    for lib in $@; do
+        found=0
+        for repo in ${repodirs[@]}; do
+            file=$repo/_lib/$lib.ezlib
+            if [[ -e $file ]]; then
+                source "$file" || panic
+                found=1
+                break
+            fi
+        done
+        [[ $found == 1 ]] || panic "library $lib.ezlib not found"
+    done
+}
+pkg_patch() { true; }
+pkg_configure() { true; }
+pkg_build() { true; }
+pkg_install() { true; }
+
+pkgworkdir=$workdir/$pkg-$ver
+mkdir -p "$pkgworkdir" || panic
+pkgworkdir=$(realpath "$pkgworkdir")
+src_root=$pkgworkdir/src/$pkg-$ver
+
+echo "using $ezbuild"
+source "$ezbuild" || panic
+
+#
+# setup workdir(see docs/workdir.md)
+#
+if ! [[ -e $pkgworkdir/state ]]; then
+    mkdir -p "$pkgworkdir/build" || panic
+    mkdir -p "$pkgworkdir/image" || panic
+    env > $pkgworkdir/env || panic
+    echo fetch > $pkgworkdir/state || panic
+fi
+
+# $@ command
+do_in_builddir() {
+    pushd "$pkgworkdir/build" > /dev/null || panic
+    "$@" || panic
+    popd
+}
+
+#
+# fetch stage
+#
+
+# $1 url
+# $2 commit hash or branch name or tag
+# $3 target dir
+git_shallow_clone_with_commit() {
+    mkdir -p "$3" || panic
+    pushd "$3" > /dev/null || panic
+    git init || panic
+    git remote add origin "$1" || panic
+    git fetch --depth=1 origin "$2" || panic
+    git checkout FETCH_HEAD || panic
+    popd || panic
+}
+
+# $1 url
+# ->
+# $reponame
+# $commit
+# $savedir
+parse_git_url() {
+    reponame=$(basename "$1" .git)
+    commit=$(eval echo \$git_${reponame}_commit)
+    if [[ -z $commit ]]; then
+        savedir="$reponame"
+    else
+        savedir="$reponame-$commit"
+    fi
+}
+
+# $1 url
+download_distfile() {
+    if [[ $1 == *.git ]]; then
+        parse_git_url "$1"
+        if ! [[ -e $distdir/$savedir ]]; then
+            if [[ -n $commit ]]; then
+                git_shallow_clone_with_commit "$1" "$commit" "$distdir/$savedir"
+            else
+                git -C "$distdir" clone --recursive --depth=1 "$1" "$savedir" || panic
+            fi
+        else
+            echo "using cache for $reponame.git"
+        fi
+    elif [[ $1 == http* ]]; then
+        name=${1##*/}
+        if ! [[ -e "$distdir/$name" ]]; then
+            curl -L -o $distdir/$name "$1" || panic
+        else
+            echo "using cache for $name"
+        fi
+    else
+        panic "unknown protocol $1"
+    fi
+}
+
+do_fetch() {
+    mkdir -p "$distdir" || panic "failed to create $distdir"
+
+    for url in ${src[@]}; do
+        echo "fetching \"$url\""
+        download_distfile "$url"
+    done
+}
+
+#
+# unpack stage
+#
+
+# $1 url
+unpack_distfile() {
+    if [[ $1 == *.git ]]; then
+        parse_git_url "$1"
+        rsync -rlK "$distdir/$savedir/" "$pkgworkdir/src/$pkg-$ver" || panic
+    elif [[ $1 == http* ]]; then
+        name=${1##*/}
+        if [[ $name == *.tar.* ]]; then
+            if [[ $name == *.tar.bz2 || $name == *.tar.gz ]]; then
+                flags=-xvf
+            elif [[ $name == *.tar.xz ]]; then
+                flags=-Jxvf
+            else
+                panic "unsupported compression type $name"
+            fi
+            tar -C "$pkgworkdir/src" $flags "$distdir/$name" || panic
+        elif [[ $name == *.tar.xz ]]; then
+            tar -C "$pkgworkdir/src" -Jxvf "$distdir/$name" || panic
+        elif [[ $name == zip ]]; then
+            unzip -d "$pkgworkdir/src" "$distdir/$name" || panic
+        else
+            panic "unsupported archive file type $name"
+        fi
+    else
+        panic "unknown protocol $1"
+    fi
+}
+
+do_unpack() {
+    mkdir -p "$pkgworkdir/src" || panic
+    for url in ${src[@]}; do
+        echo "unpacking \"$url\""
+        unpack_distfile "$url"
+    done
+
+    if [[ -z $src ]]; then
+        echo "no src defined, skipping patch step"
+        return
+    fi
+
+    # apply patches
+    pushd "$src_root" > /dev/null || panic
+    for patch in ${patches[@]}; do
+        file=${ezbuild%/*}/$patch
+        echo "applying $patch"
+        patch -p1 < $file
+    done
+    pkg_patch || panic
+    popd
+}
+
+#
+# configure stage
+#
+do_configure() {
+    do_in_builddir pkg_configure
+}
+
+#
+# build stage
+#
+do_build() {
+    do_in_builddir pkg_build
+}
+
+#
+# install stage
+#
+do_install() {
+    destdir=$pkgworkdir/image
+    do_in_builddir pkg_install
+}
+
+#
+# merge stage
+#
+do_merge() {
+    destdir=$pkgworkdir/image
+    db=$(realpath "$dbdir/$pkg-$ver")
+    mkdir -p "$dbdir" || panic
+    pushd "$destdir" > /dev/null || panic
+    find -mindepth 1 | sed -e 's/\.//' > $db
+    rsync -rlK . /
+}
+
+#
+# cleanup stage
+#
+do_cleanup() {
+    echo "INFO: ezpkg do not delete workdir to avoid accident"
+    echo "INFO: please delete $pkgworkdir manually"
+    # rm -rf "$pkgworkdir"
+}
+
+#
+# main
+#
+
+# $1 stage
+check_stage() {
+    if [[ $(<$pkgworkdir/state) != $1 ]]; then
+        echo "skipping $1"
+        return 1
+    fi
+    return 0
+}
+
+check_stage fetch       && do_fetch     && echo unpack      > $pkgworkdir/state
+check_stage unpack      && do_unpack    && echo configure   > $pkgworkdir/state
+check_stage configure   && do_configure && echo build       > $pkgworkdir/state
+check_stage build       && do_build     && echo install     > $pkgworkdir/state
+check_stage install     && do_install   && echo merge       > $pkgworkdir/state
+check_stage merge       && do_merge     && echo cleanup     > $pkgworkdir/state
+check_stage cleanup     && do_cleanup   && echo "package $pkg-$ver merged"
