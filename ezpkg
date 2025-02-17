@@ -111,7 +111,7 @@ git_shallow_clone_with_commit() {
 # $savedir
 parse_git_url() {
     reponame=$(basename "$1" .git)
-    commit=$(eval echo \$git_${reponame//-/_}_commit)
+    commit=$(eval echo \$git_${reponame//[-.]/_}_commit)
     if [[ -z $commit ]]; then
         savedir="$reponame"
     else
