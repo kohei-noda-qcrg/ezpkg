@@ -235,7 +235,7 @@ do_install() {
 #
 do_merge() {
     destdir=$pkgworkdir/image
-    db=$(realpath "$dbdir/$pkg-$ver")
+    db=$(realpath "$dbdir")/$pkg-$ver
     mkdir -p "$dbdir" || panic
     pushd "$destdir" > /dev/null || panic
     find -mindepth 1 | sed -e 's/\.//' > $db
