@@ -101,6 +101,7 @@ git_shallow_clone_with_commit() {
     git remote add origin "$1" || panic
     git fetch --depth=1 origin "$2" || panic
     git checkout FETCH_HEAD || panic
+    git submodule update --recursive --init || panic
     popd || panic
 }
 
