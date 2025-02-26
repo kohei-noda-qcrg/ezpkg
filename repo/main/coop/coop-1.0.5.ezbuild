@@ -1,0 +1,6 @@
+inherit meson
+
+src=(
+    https://github.com/mojyack/coop.git
+)
+git_coop_commit=v$ver
