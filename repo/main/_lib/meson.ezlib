@@ -1,0 +1,24 @@
+meson_configure() {
+    meson setup --buildtype=release --prefix="$prefix" "$@" "$src_root" . || panic
+}
+
+meson_build() {
+    meson compile --jobs $makejobs || panic
+}
+
+meson_install() {
+    meson install --destdir "$destdir" || panic
+}
+
+# default callbacks
+pkg_configure() {
+    meson_configure
+}
+
+pkg_build() {
+    meson_build
+}
+
+pkg_install() {
+    meson_install
+}
