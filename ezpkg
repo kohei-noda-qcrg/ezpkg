@@ -120,6 +120,21 @@ parse_git_url() {
     fi
 }
 
+# $1 project root
+clone_submod() {
+    if [[ ! -e $1/submodules.txt || -e $1/submodules ]]; then
+        return
+    fi
+    submod=$(realpath $distdir/submod)
+    if [[ ! -e $submod ]]; then
+        curl -L -o "$submod" "https://raw.githubusercontent.com/mojyack/dotfiles/refs/heads/main/link/bin/submod" || panic
+        chmod +x "$submod" || panic
+    fi
+    pushd "$1" || panic
+    "$submod" clone || panic
+    popd
+}
+
 # $1 url
 download_distfile() {
     if [[ $1 == *.git ]]; then
@@ -128,8 +143,9 @@ download_distfile() {
             if [[ -n $commit ]]; then
                 git_shallow_clone_with_commit "$1" "$commit" "$distdir/$savedir"
             else
-                git -C "$distdir" clone --recursive --depth=1 "$1" "$savedir" || panic
+                git clone --recursive --depth=1 "$1" "$distdir/$savedir" || panic
             fi
+            clone_submod "$distdir/$savedir"
         else
             echo "using cache for $reponame.git"
         fi
