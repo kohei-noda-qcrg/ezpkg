@@ -1,0 +1,5 @@
+inherit imobiledevice-git
+
+pkg_configure() {
+    CFLAGS="$CFLAGS -D_GNU_SOURCE" imobiledevice_git_configure --without-cython
+}

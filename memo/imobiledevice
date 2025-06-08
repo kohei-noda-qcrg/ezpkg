@@ -7,3 +7,4 @@
 ./ezpkg libirecovery git
 ./ezpkg libzip 1.11.3
 ./ezpkg idevicerestore git
+./ezpkg ifuse git
