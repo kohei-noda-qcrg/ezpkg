@@ -127,7 +127,7 @@ clone_submod() {
     fi
     submod=$(realpath $distdir/submod)
     if [[ ! -e $submod ]]; then
-        curl -L -o "$submod" "https://raw.githubusercontent.com/mojyack/dotfiles/refs/heads/main/link/bin/submod" || panic
+        curl -L -o "$submod" "https://raw.githubusercontent.com/mojyack/submod/refs/heads/main/submod" || panic
         chmod +x "$submod" || panic
     fi
     pushd "$1" || panic
